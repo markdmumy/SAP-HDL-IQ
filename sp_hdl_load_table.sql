@@ -9,7 +9,7 @@ create procedure sp_hdl_load_table (
 	, in load_type varchar(128) default 'server'
 	, in file_string long varchar
 	, in cloud_auth_string long varchar default null
-	, in col_delimiter varchar(10) default '''\x09'''
+	, in col_delimiter varchar(10) default '\x09'
 )
 begin
 	-- all object names are CASE SENSITIVE: events is not the same as Events or EVENTS

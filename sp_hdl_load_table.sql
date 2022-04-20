@@ -64,10 +64,8 @@ begin
 			set col_str = col_str+comma+column_name+' binary with null byte';
 		else
 			set col_str = col_str+comma+column_name+' NULL( blanks, ''NULL'' )';
-			if tbl_name = 'events' and domain_name = 'timestamp'
-				then
-				set col_str = col_str+' DATETIME( ''yyyymmddhhnnss'' ) , filler(1)'
-			end if;
+			-- put the DATETIME formatter into the LOAD, just in case
+			--set col_str = col_str+' DATETIME( ''yyyymmddhhnnss'' ) , filler(1)'
 		end if;
 		set comma=char(10)+','
 	end for;

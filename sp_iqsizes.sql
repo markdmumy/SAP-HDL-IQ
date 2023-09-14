@@ -1,3 +1,7 @@
+--
+-- all code and scripts are provided as-is
+--
+
 drop procedure if exists sp_iqsizes;
 
 create procedure sp_iqsizes(
@@ -48,11 +52,12 @@ begin
         end for;
 
 	message '' to client;
+	message '*****  HDLRE Server: ' + @@servername to client;
 	message '*****  Owner filter: ' + in_own to client;
 	message '***** Object filter: ' + in_tbl to client;
 	message '*****   Size Factor: ' + in_size to client;
 	message '' to client;
-	execute immediate with result set on 'select table_owner, table_name, convert( varchar(60), convert( double, round( size, 4 ) ) ) as ''' + size_name + ''', commas_int( rowcount ) as RowCount from size_res';
+	execute immediate with result set on 'select table_owner, table_name, convert( varchar(60), convert( numeric(20,4), size) ) as ''' + size_name + ''', commas_int( rowcount ) as RowCount from size_res order by 1,2';
 end;
 
 --call sp_iqsizes();

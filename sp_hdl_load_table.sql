@@ -1,7 +1,4 @@
-drop procedure if exists sp_hdl_load_table
-go
-set quoted_identifier on
-go
+drop procedure if exists sp_hdl_load_table ;
 
 create procedure sp_hdl_load_table (
 	in tbl_owner varchar(128)
@@ -10,6 +7,7 @@ create procedure sp_hdl_load_table (
 	, in file_string long varchar
 	, in cloud_auth_string long varchar default null
 	, in col_delimiter varchar(10) default '\x09'
+	, in ascii_type varchar(10) default 'csv'
 )
 begin
 	-- all object names are CASE SENSITIVE: events is not the same as Events or EVENTS
@@ -38,6 +36,7 @@ begin
 	declare rt_ms unsigned bigint;
 
 	set temporary option MAX_QUERY_PARALLELISM = 256;
+	--set temporary option isql_allow_read_client_file = 'on';
 	--set temporary option max_iq_threads_per_connection = 256;
 	--set temporary option max_iq_threads_per_team = 256;
 
@@ -61,9 +60,9 @@ begin
 		--set col_str = col_str+comma+column_name+' null( zeros, blanks )';
 		if lower( col_delimiter ) = 'binary'
 			then
-			set col_str = col_str+comma+column_name+' binary with null byte';
+			set col_str = col_str+comma+'"'+column_name+'"'+' binary with null byte';
 		else
-			set col_str = col_str+comma+column_name+' NULL( blanks, ''NULL'' )';
+			set col_str = col_str+comma+'"'+column_name+'"'+' NULL( blanks, ''NULL'' )';
 			-- put the DATETIME formatter into the LOAD, just in case
 			--set col_str = col_str+' DATETIME( ''yyyymmddhhnnss'' ) , filler(1)'
 		end if;
@@ -91,10 +90,12 @@ begin
 		then
 		message '**** building binary file format *****' to client;
                 set format_str = 'FORMAT binary'+char(10);
+
 	else
-		message '**** building csv file format *****' to client;
-		--select '**** building csv file format *****';
-                set format_str = 'FORMAT csv'+char(10)+
+		message '**** building '+ascii_type+' file format *****' to client;
+		--select '**** building '+ascii_type+' file format *****';
+                set format_str = 'FORMAT '+ascii_type+char(10)+
+
                 'DELIMITED BY '''+col_delimiter+''''+char(10)+
                 'ROW DELIMITED BY ''\n'''+char(10);
 		if lower( load_type ) = 'client'
@@ -119,7 +120,7 @@ begin
 	-- build load statement
 	set load_stmt = 'load table "' +
 		tbl_owner + '"."' + tbl_name + '" (' + char(10) +
-		col_str + char(10) +
+		+col_str + char(10) +
 		')' + char(10) +
 		using_string + ' ' + file_string +char(10)+
 		cloud_auth_string +char(10)+
@@ -140,7 +141,10 @@ begin
 	execute immediate 'select count(*) into start_rc from '+tbl_owner+'.'+tbl_name;
 	set start_tm = getdate();
 	--message short_load_stmt to client;
+	message '**** current hdl node: ', @@servername, ' *****' to client;
+	message '**** current hdl conn: ', @@spid, ' *****' to client;
 	message '**** loading data now: ', getdate(), ' *****' to client;
+	--message load_stmt to client;
 	execute immediate load_stmt;
 	--waitfor delay '00:00:01';
 	set stop_tm = getdate();
@@ -158,4 +162,3 @@ begin
 	message 'rows/sec:		'||convert( double, ( rc / convert( double , rt_ms ) ) * 1000.0 ) to client;
 
 end;
-go

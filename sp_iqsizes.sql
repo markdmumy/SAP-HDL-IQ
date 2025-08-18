@@ -5,9 +5,10 @@
 drop procedure if exists sp_iqsizes;
 
 create procedure sp_iqsizes(
-	in_tbl varchar(255) default '%',
-	in_own varchar(255) default '%',
-	in_size varchar(2) default 'kb'
+	in_tbl varchar(255) default '%'
+	,in_own varchar(255) default '%'
+	,in_size varchar(2) default 'kb'
+	,log_table varchar(128) default null
 )
 begin
         declare local temporary table size_res (
@@ -15,12 +16,13 @@ begin
                 , table_name varchar(128)
                 , size double
                 , rowcount unsigned bigint
-                ) in SYSTEM;
+                ) in SYSTEM on commit preserve rows;
         declare sizeKB double;
         declare rc unsigned bigint;
         declare blksz unsigned int;
         declare size_factor double;
 	declare size_name varchar(15);
+	declare log_size_name varchar(15);
 
         select first block_size/512/2 into blksz from SYS.SYSIQINFO;
 
@@ -36,6 +38,7 @@ begin
 		message 'in_size must be kb, mb, gb, or tb' to client;
 	end if;
 	set size_name = 'size in '+upper( in_size );
+	set log_size_name = 'size_'+upper( in_size );
 
         FOR FORLOOP as FORCRSR CURSOR FOR select table_name, user_name table_owner
             from sys.systable, sys.sysuser where creator <> 3 and server_type = 'IQ'
@@ -57,13 +60,20 @@ begin
 	message '***** Object filter: ' + in_tbl to client;
 	message '*****   Size Factor: ' + in_size to client;
 	message '' to client;
+	if log_table is not null then
+		message '***** Output data is saved to table: '||log_table to client;
+		message '' to client;
+		--message 'select table_owner, table_name, convert( varchar(60), convert( numeric(20,4), size) ) as ''' + log_size_name + ''', rowcount as RowCount into '||log_table||' from size_res;' to client;
+	end if;
 	execute immediate with result set on 'select table_owner, table_name, convert( varchar(60), convert( numeric(20,4), size) ) as ''' + size_name + ''', commas_int( rowcount ) as RowCount from size_res order by 1,2';
-end;
 
---call sp_iqsizes();
---call sp_iqsizes( in_size='kB', in_own = 'dba%');
---call sp_iqsizes( in_size='MB', in_own = 'dba%');
---call sp_iqsizes( in_size='gB', in_own = 'dba%');
---call sp_iqsizes( in_size='tB', in_own = 'dba%');
---call sp_iqsizes(in_size='tb',  in_tbl = 'table_name%' );
---call sp_iqsizes( in_tbl = '%vt%', in_own = '%rep%');
+	if log_table is not null then
+		message '' to client;
+		message '***** copying data to permanent table: '||log_table to client;
+		message '***** this may take some time' to client;
+		message '' to client;
+		execute immediate 'drop table if exists '||log_table;
+		execute immediate 'select table_owner, table_name, convert( varchar(60), convert( numeric(20,4), size) ) as ''' + log_size_name + ''', rowcount as RowCount into '||log_table||' from size_res;';
+	end if;
+
+end;

@@ -8,7 +8,6 @@
 -- you can specify any dbcc type: check, verify, allocation, dropleaks
 -- all logging goes to DBCC_LOG_TABLE and DBCC_LOGS
 
-
 drop procedure if exists sp_iqcheckdb_indexes;
 
 create procedure sp_iqcheckdb_indexes(
@@ -21,6 +20,7 @@ begin
 	declare fullNDX varchar(250);
 	declare DBCC_COMMAND varchar(250);
 	declare DBCC_ERROR varchar(250);
+	declare does_table_exist int;
 
 	if lower ( in_dbcc_check_type ) <> 'allocation'
 		and lower ( in_dbcc_check_type ) <> 'check'
@@ -31,7 +31,10 @@ begin
 		return;
 	end if;
 
-	if lower( in_create_table ) = 'yes' then
+	set does_table_exist=0;
+	select count(*) into does_table_exist from systable where lower ( table_name ) = lower ( 'DBCC_LOG_TABLE' ) or lower ( table_name ) = lower ( 'DBCC_LOGS' );
+
+	if lower( in_create_table ) = 'yes' or does_table_exist <> 2 then
 		message 'dropping old tables' to client;
 		drop table if exists DBCC_LOG_TABLE;
 		drop table if exists DBCC_LOGS;
